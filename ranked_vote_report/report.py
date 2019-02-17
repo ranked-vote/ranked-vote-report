@@ -1,14 +1,14 @@
-from ranked_vote_import.bin.import_rcv_data import import_rcv_data
-from ranked_vote.methods import METHODS
-from ranked_vote.format import read_ballots
-from ranked_vote.analysis.pairwise_preferences import PreferenceMatrix
-from ranked_vote.analysis.first_alternate import FirstAlternates
-from ranked_vote.analysis.final_by_first import FinalByFirst
-from ranked_vote.ballot import Candidate
-
-from typing import List, Dict, Set
-from os import path
 import json
+from os import path
+from typing import List, Dict, Set
+
+from ranked_vote.analysis.final_by_first import FinalByFirst
+from ranked_vote.analysis.first_alternate import FirstAlternates
+from ranked_vote.analysis.pairwise_preferences import PreferenceMatrix
+from ranked_vote.ballot import Candidate
+from ranked_vote.format import read_ballots
+from ranked_vote.methods import METHODS
+from ranked_vote_import.bin.import_rcv_data import import_rcv_data
 
 
 def graph_to_dict(graph: Dict[Candidate, Set[Candidate]]) -> List[Dict]:
