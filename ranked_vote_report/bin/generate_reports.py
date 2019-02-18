@@ -1,24 +1,28 @@
 import argparse
 import json
 from glob import glob
-from os import makedirs
-from os import path
+from os import path, chdir, getcwd
 
 from ranked_vote_report.report import run_report
 
 
-def generate_reports(raw, elections, out_dir):
-    for election_json_file in glob(path.join(elections, '**/*.json'), recursive=True):
-        election_dir = path.dirname(election_json_file)
-        election_filename, _ = path.splitext(path.basename(election_json_file))
+def rel_glob(pattern, new_dir):
+    old_dir = getcwd()
+    chdir(new_dir)
+    result = glob(pattern, recursive=True)
+    chdir(old_dir)
+    return result
 
-        with open(election_json_file) as fh:
+
+def generate_reports(raw, elections, out_dir):
+    for election_json_file in rel_glob('**/*.json', elections):
+        print('Processing {}'.format(election_json_file))
+        election_filename, _ = path.splitext(election_json_file)
+
+        with open(path.join(elections, election_json_file)) as fh:
             metadata = json.load(fh)
 
-        od = path.join(out_dir, election_dir)
-        makedirs(od, exist_ok=True)
-
-        run_report(metadata, raw, path.join(od, election_filename))
+        run_report(metadata, election_filename, out_dir, raw)
 
 
 def main():

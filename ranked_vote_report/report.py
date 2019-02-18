@@ -1,14 +1,14 @@
 import json
-from os import path
+from os import path, makedirs
 from typing import List, Dict, Set
 
 from ranked_vote.analysis.final_by_first import FinalByFirst
 from ranked_vote.analysis.first_alternate import FirstAlternates
 from ranked_vote.analysis.pairwise_preferences import PreferenceMatrix
 from ranked_vote.ballot import Candidate
-from ranked_vote.format import read_ballots
+from ranked_vote.format import write_ballots
 from ranked_vote.methods import METHODS
-from ranked_vote_import.bin.import_rcv_data import import_rcv_data
+from ranked_vote_import import FORMATS, NORMALIZERS
 
 
 def graph_to_dict(graph: Dict[Candidate, Set[Candidate]]) -> List[Dict]:
@@ -21,24 +21,32 @@ def graph_to_dict(graph: Dict[Candidate, Set[Candidate]]) -> List[Dict]:
     ]
 
 
-def run_report(metadata, base_dir, output_name, force=False):
-    files = [path.join(base_dir, f) for f in metadata['files']]
-    print(output_name)
+def run_report(metadata, output_name, output_base_dir, data_base_dir, force=False):
+    params = metadata.get('params', dict())
+    files = metadata['files']
+    fmt = metadata['format']
 
-    normalized_data_filename = output_name + '.normalized.csv.gz'
+    data_out_filename = output_name + '.normalized.csv.gz'
+    data_out_full_path = path.join(output_base_dir, data_out_filename)
+    report_out_filename = path.join(output_base_dir, output_name + '.json')
 
-    if not path.exists(normalized_data_filename) or force:
-        import_rcv_data(metadata['format'], files, normalized_data_filename, True)
+    makedirs(path.dirname(data_out_full_path), exist_ok=True)
 
-    with open(output_name + '.normalized.json') as meta_fh:
-        meta = json.load(meta_fh)
+    if path.exists(data_out_full_path) and path.exists(report_out_filename) and not force:
+        print('Nothing to do.')
+        return
 
-    # TODO: use ballots for candidates
-    candidates = [Candidate(c) for c in meta['candidates']]
+    reader = FORMATS[fmt](files, params, data_base_dir)
 
-    ballots = list(read_ballots(normalized_data_filename))
+    normalizer = NORMALIZERS[fmt]()
+
+    ballots = [normalizer.normalize(ballot) for ballot in reader]
+    write_ballots(data_out_full_path, ballots)
+
+    meta = reader.get_metadata()
 
     tabulator = METHODS[metadata['tabulation']](ballots)
+    candidates = tabulator.candidates
 
     matrix = PreferenceMatrix(candidates, ballots)
     first_alternates = FirstAlternates(candidates, ballots)
@@ -46,6 +54,7 @@ def run_report(metadata, base_dir, output_name, force=False):
 
     result = {
         'meta': meta,
+        'normalized_ballots': data_out_filename,
         'candidates': [str(c) for c in tabulator.candidates],
         'rounds': [r.to_dict() for r in tabulator.rounds],
         'smith_set': [str(c) for c in matrix.smith_set],
@@ -56,5 +65,5 @@ def run_report(metadata, base_dir, output_name, force=False):
         'final_by_first': final_by_first.to_dict_list()
     }
 
-    with open(output_name + '.json', 'w') as ofh:
+    with open(report_out_filename, 'w') as ofh:
         json.dump(result, ofh, indent=2)
