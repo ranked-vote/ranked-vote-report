@@ -15,7 +15,7 @@ def graph_to_dict(graph: Dict[Candidate, Set[Candidate]]) -> List[Dict]:
     return [
         {
             'source': str(c),
-            'edges': [str(e) for e in edges]
+            'edges': [str(e) for e in sorted(edges)]
         }
         for c, edges in graph.items()
     ]
@@ -26,11 +26,11 @@ def run_report(metadata, output_name, output_base_dir, data_base_dir, force=Fals
     files = metadata['files']
     fmt = metadata['format']
 
-    data_out_filename = output_name + '.normalized.csv.gz'
+    data_out_filename = path.join(output_name, output_name.replace('/', '_') + '.normalized.csv.gz')
     data_out_full_path = path.join(output_base_dir, data_out_filename)
-    report_out_filename = path.join(output_base_dir, output_name + '.json')
+    report_out_filename = path.join(output_base_dir, output_name, 'report.json')
 
-    makedirs(path.dirname(data_out_full_path), exist_ok=True)
+    makedirs(path.dirname(report_out_filename), exist_ok=True)
 
     if path.exists(data_out_full_path) and path.exists(report_out_filename) and not force:
         print('Nothing to do.')
@@ -43,7 +43,9 @@ def run_report(metadata, output_name, output_base_dir, data_base_dir, force=Fals
     ballots = [normalizer.normalize(ballot) for ballot in reader]
     write_ballots(data_out_full_path, ballots)
 
-    meta = reader.get_metadata()
+    meta = dict(metadata)
+    meta.update(reader.get_metadata())
+    meta['normalized_ballots'] = data_out_filename
 
     tabulator = METHODS[metadata['tabulation']](ballots)
     candidates = tabulator.candidates
@@ -52,17 +54,20 @@ def run_report(metadata, output_name, output_base_dir, data_base_dir, force=Fals
     first_alternates = FirstAlternates(candidates, ballots)
     final_by_first = FinalByFirst(tabulator)
 
+    if 'candidates' not in meta:
+        meta['candidates'] = [c.to_dict() for c in tabulator.candidates]
+
     result = {
         'meta': meta,
-        'normalized_ballots': data_out_filename,
         'candidates': [str(c) for c in tabulator.candidates],
+        'winner': str(tabulator.winner),
         'rounds': [r.to_dict() for r in tabulator.rounds],
         'smith_set': [str(c) for c in matrix.smith_set],
         'condorcet': str(matrix.condorcet_winner),
         'graph': graph_to_dict(matrix.graph),
         'pairwise': matrix.to_dict_list(),
         'first_alternates': first_alternates.to_dict_list(),
-        'final_by_first': final_by_first.to_dict_list()
+        'final_by_first': final_by_first.to_dict()
     }
 
     with open(report_out_filename, 'w') as ofh:

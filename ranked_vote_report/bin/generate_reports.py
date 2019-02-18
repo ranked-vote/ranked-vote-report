@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--raw', help='The directory of raw data files.', default='raw')
     parser.add_argument('-e', '--elections', help='The director of election JSON files.', default='elections')
-    parser.add_argument('-o', '--out-dir', help='The directory to put the output data.', default='output')
+    parser.add_argument('-o', '--out-dir', help='The directory to put the output data.', default='reports')
 
     args = parser.parse_args()
     generate_reports(**vars(args))
